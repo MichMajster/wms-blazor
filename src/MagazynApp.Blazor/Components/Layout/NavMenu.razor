@@ -1,0 +1,237 @@
+﻿@using MagazynApp.Application.Interfaces;
+@using MagazynApp.Domain.Entities;
+@using MagazynApp.Infrastructure.Services;
+@using MagazynApp.Blazor.Auth
+@using Microsoft.AspNetCore.Components.Authorization
+
+@inject AuthService AuthService
+@inject AuthenticationStateProvider AuthStateProvider
+@rendermode InteractiveServer
+
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">Kontrola Magazynu</a>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="nav flex-column">
+
+        <AuthorizeView Roles="Admin, Manager">
+            <Authorized>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="magazyny">
+                        <span class="bi bi-building" aria-hidden="true"></span> Magazyny
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="lokalizacje">
+                        <span class="bi bi-geo-alt" aria-hidden="true"></span> Lokalizacje
+                    </NavLink>
+                </div>
+            </Authorized>
+        </AuthorizeView>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="przedmioty">
+                <span class="bi bi-boxes" aria-hidden="true"></span> Przedmioty
+            </NavLink>
+        </div>
+        <AuthorizeView Roles="Admin, Manager">
+            <Authorized>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="kontrahenci">
+                        <span class="bi bi-person-badge" aria-hidden="true"></span> Kontrahenci
+                    </NavLink>
+                </div>
+            </Authorized>
+        </AuthorizeView>
+        <AuthorizeView Roles="Admin, User">
+            <Authorized>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="users">
+                        <span class="bi bi-person-gear" aria-hidden="true"></span> Użytkownicy
+                    </NavLink>
+                </div>
+            </Authorized>
+        </AuthorizeView>
+        <div class="nav-item px-3" style="position: absolute; bottom: 1rem; left: 0.4rem; width: 100%;">
+            <AuthorizeView>
+                <Authorized>
+                    <div class="text-white mb-2 px-3 small">
+                        Zalogowany: <strong>@context.User.Identity?.Name</strong>
+                    </div>
+                    <button class="nav-link bg-transparent border-0 p-0 text-start" @onclick="Wyloguj">
+                        <span class="bi bi-box-arrow-in-right" aria-hidden="true"></span> Wyloguj się
+                    </button>
+                </Authorized>
+                <NotAuthorized>
+                    <button class="nav-link bg-transparent border-0 p-0 text-start" @onclick="OpenModalLogin">
+                        <span class="bi bi-box-arrow-in-left" aria-hidden="true"></span> Zaloguj się
+                    </button>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+    </nav>
+</div>
+@if (ZALOGUJ)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(isRejestracja ? "REJESTRACJA" : "LOGOWANIE")</h5>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger py-2 mb-3">@errorMessage</div>
+                    }
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Nazwa użytkownika:</label>
+                        <input type="text" class="form-control" @bind="nowaNazwa" placeholder="Login" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Hasło:</label>
+                        <input type="password" class="form-control" @bind="noweHaslo" placeholder="Hasło" />
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        @if (isRejestracja)
+                        {
+                            <button type="button" class="btn btn-link p-0 text-decoration-none" @onclick="() => { isRejestracja = false; errorMessage = null; }">
+                                Masz już konto? Zaloguj się
+                            </button>
+                            <button type="button" class="btn btn-primary" @onclick="ZarejestrujUser">Zarejestruj</button>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-link p-0 text-decoration-none" @onclick="() => { isRejestracja = true; errorMessage = null; }">
+                                Nie masz konta? Zarejestruj się
+                            </button>
+                            <button type="button" class="btn btn-success" @onclick="ZalogujUser">Zaloguj</button>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+@if (LIMIT)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">BŁĄD REJESTRACJI</h5>
+                    <button type="button" class="btn-close btn-close-white" aria-label="Close" @onclick="CloseModalLIMIT"></button>
+                </div>
+                <div class="modal-body text-start">
+                    <p class="mb-2">
+                        Użytkownik <strong>"@(nowaNazwa)"</strong> już istnieje w bazie danych.
+                    </p>
+                    <p class="mb-0 text-muted">
+                        Wybierz inną nazwę użytkownika!
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModalLIMIT">Zamknij</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+@code {
+    private bool ZALOGUJ = false;
+    private bool LIMIT = false;
+    private bool isRejestracja = false; // czy logowanie czy rejestracja
+
+    private string nowaNazwa = string.Empty;
+    private string noweHaslo = string.Empty;
+    private string? errorMessage;
+
+    private void OpenModalLogin()
+    {
+        ClearFields();
+        isRejestracja = false;
+        ZALOGUJ = true;
+    }
+
+    private void CloseModal()
+    {
+        ZALOGUJ = false;
+        ClearFields();
+    }
+
+    private void CloseModalLIMIT()
+    {
+        LIMIT = false;
+    }
+
+    private void ClearFields()
+    {
+        nowaNazwa = string.Empty;
+        noweHaslo = string.Empty;
+        errorMessage = null;
+    }
+
+    private async Task ZalogujUser()
+    {
+        errorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(nowaNazwa) || string.IsNullOrWhiteSpace(noweHaslo))
+        {
+            errorMessage = "Wpisz nazwę użytkownika i hasło!";
+            return;
+        }
+
+        var user = await AuthService.ValidateUserAsync(nowaNazwa, noweHaslo);
+
+        if (user != null)
+        {
+            var customAuth = (CustomAuthStateProvider)AuthStateProvider;
+            customAuth.MarkUserAsAuthenticated(user.Username, user.Role);
+
+            CloseModal();
+        }
+        else
+        {
+            errorMessage = "Nieprawidłowa nazwa użytkownika lub hasło.";
+        }
+    }
+
+    private async Task ZarejestrujUser()
+    {
+        errorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(nowaNazwa) || string.IsNullOrWhiteSpace(noweHaslo))
+        {
+            errorMessage = "Wypełnij wszystkie pola!";
+            return;
+        }
+
+        var sukces = await AuthService.RegisterAsync(nowaNazwa, noweHaslo);
+
+        if (!sukces)
+        {
+            LIMIT = true;
+        }
+        else
+        {
+            // Po udanej rejestracji automatycznie loguje użytkownika
+            await ZalogujUser();
+        }
+    }
+
+    private void Wyloguj()
+    {
+        var customAuth = (CustomAuthStateProvider)AuthStateProvider;
+        customAuth.MarkUserAsLoggedOut();
+    }
+}
+

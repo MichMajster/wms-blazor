@@ -1,0 +1,483 @@
+﻿
+@page "/lokalizacje"
+@* @attribute [Authorize(Roles = "Admin, Manager")]
+@using Microsoft.AspNetCore.Authorization *@
+
+@using MagazynApp.Application.Interfaces;
+@using MagazynApp.Domain.Entities
+@inject ILokalizacjaRepository LokalizacjaRepository
+@inject IMagazynRepository MagazynRepository
+@rendermode InteractiveServer
+
+<PageTitle>LOKALIZACJE</PageTitle>
+<h3>TU JEST INFO O LOKALIZACJACH</h3>
+
+@if (Loki == null){
+	<p>Ładowanie...</p>
+}
+else if(WyswietlID == 0)
+{
+	<p>Wszystkich lokalizacji jest: <strong>@Loki.Count</strong></p>
+}
+else
+{
+	<p>Wszystkich lokalizacji w <strong>magazynie @WyswietlID</strong> jest: <strong>@Loki.Count</strong></p>
+}
+
+
+<div class="row align-items-center g-2 mb-3">
+    <div class="col-auto">
+        <button type="button" class="btn btn-primary" @onclick="OpenModalADD">
+            Dodaj lokalizację
+        </button>
+    </div>
+	<div class="col-auto">
+        <button type="button" class="btn btn-secondary" @onclick="OpenModalEDIT">
+            Edytuj lokalizację
+        </button>
+    </div>
+    <div class="col-auto">
+        <button type="button" class="btn btn-secondary" @onclick="OpenModalDEL">
+            Usuń lokalizację
+        </button>
+    </div>
+	@* ms-auto sprawia ze ostatnia kolumna zajmuje cale pozostale miejsce i daje do prawej zawartosc*@
+	@* d-flex to display flex *@
+	@* mb-0 to margin-bottom: 0 *@
+	@* fw-bold to font-weight:bold *@
+    <div class="col-auto ms-auto d-flex align-items-center gap-2">
+        <label class="form-label mb-0 fw-bold text-nowrap">Wybierz magazyn:</label>
+        <select class="form-select" @onchange="OnMagazynSelected">
+            <option value="0">-- Wszystkie magazyny --</option>
+            @if (Mags != null)
+            {
+                @foreach (var mag in Mags)
+                {
+                    <option value="@mag.Id">ID: @mag.Id (@mag.Nazwa)</option>
+                }
+            }
+        </select>
+    </div>
+</div>
+
+@if (isModalOpen){
+	<div class="modal" tabindex="-1" style="display: block; background-color: rgba(0,0,0,0.5);">
+	  <div class="modal-dialog">
+		<div class="modal-content">
+		  <div class="modal-header">
+			<h5 class="modal-title">DODAJ LOKALIZACJĘ</h5>
+			<button type="button" class="btn-close" aria-label="Close" @onclick="CloseModal"></button>
+		  </div>
+			<div class="modal-body">
+			<div class="form-row">
+				<div class="col-auto ms-auto d-flex align-items-center gap-2 mb-3">
+				<label class="form-label mb-0 fw-bold text-nowrap">Wybierz magazyn:</label>
+				<select class="form-select" @onchange="OnMagazynSelectedMODAL">
+					<option value="0">Wybierz magazyn</option>
+					@if (Mags != null)
+					{
+						@foreach (var mag in Mags)
+						{
+							<option value="@mag.Id">ID: @mag.Id (@mag.Nazwa)</option>
+						}
+					}
+				</select>
+				</div>
+			<div class="mb-3">
+				<input type="text" class="form-control" @bind="nowaNazwa" placeholder="Nazwa Lokalizacji">
+			</div>
+			<div class="mb-3">
+				<input type="text" class="form-control" @bind="nowyOpis" placeholder="Opis Lokalizacji">
+			</div>
+				<div class="mb-3">
+					<label class="form-label fw-bold d-block">Typ lokalizacji:</label>
+					<InputRadioGroup @bind-Value="wybranyTyp">
+						<div class="form-check form-check-inline">
+							<InputRadio class="form-check-input" Value="true" id="radioDostawcaEdit" />
+							<label class="form-check-label" for="radioDostawcaEdit">Podloga</label>
+						</div>
+						<div class="form-check form-check-inline">
+							<InputRadio class="form-check-input" Value="false" id="radioOdbiorcaEdit" />
+							<label class="form-check-label" for="radioOdbiorcaEdit">Polka</label>
+						</div>
+					</InputRadioGroup>
+				</div>
+				<div class="mb-3">
+					<label class="form-label fw-bold d-block">Przeznaczenie lokalizacji:</label>
+	
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" id="zalLOKI" @bind="ZALLoki">
+						<label class="form-check-label" for="zalLOKI">Czy załadunek?</label>
+					</div>
+	
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" id="rozLOKI" @bind="ROZLoki">
+						<label class="form-check-label" for="rozLOKI">Czy rozładunek?</label>
+					</div>
+				</div>
+		  </div>
+		  <div class="modal-footer">
+			<button type="button" class="btn btn-secondary" @onclick="CloseModal">Zamknij</button>
+			<button type="button" class="btn btn-primary" @onclick="DodajLok">Dodaj</button>
+		  </div>
+		</div>
+	  </div>
+	</div>
+	</div>
+}
+
+@if (isModalOpenEDIT){
+	<div class="modal" tabindex="-1" style="display: block; background-color: rgba(0,0,0,0.5);">
+	  <div class="modal-dialog">
+		<div class="modal-content">
+		  <div class="modal-header">
+			<h5 class="modal-title">EDYTUJ LOKALIZACJĘ</h5>
+			<button type="button" class="btn-close" aria-label="Close" @onclick="CloseModal"></button>
+		  </div>
+		  <div class="modal-body">
+			  	<div class="col-auto ms-auto d-flex align-items-center gap-2 mb-3">
+					<label class="form-label mb-0 fw-bold text-nowrap">Wybierz lokalizację:</label>
+					<select class="form-select" @onchange="OnLokalizacjaSelectedMODAL">
+						<option value="0">-- Wybierz lokalizację --</option>
+						@if (Loki != null)
+						{
+							@foreach (var mag in Loki)
+							{
+								<option value="@mag.Id">ID: @mag.Id (@mag.Nazwa)</option>
+							}
+						}
+					</select>
+				</div>
+			<div class="form-row mb-3">
+				<div class="mb-3">
+					<input type="text" class="form-control" @bind="nowaNazwa" placeholder="Nazwa lokalizacji">
+				</div>
+				<div class="mb-3">
+					<input type="text" class="form-control" @bind="nowyOpis" placeholder="Opis lokalizacji">
+				</div>
+				<div class="mb-3">
+					<label class="form-label fw-bold d-block">Typ lokalizacji:</label>
+					<InputRadioGroup @bind-Value="wybranyTyp">
+						<div class="form-check form-check-inline">
+							<InputRadio class="form-check-input" Value="true" id="radioDostawcaEdit" />
+							<label class="form-check-label" for="radioDostawcaEdit">Podloga</label>
+						</div>
+						<div class="form-check form-check-inline">
+							<InputRadio class="form-check-input" Value="false" id="radioOdbiorcaEdit" />
+							<label class="form-check-label" for="radioOdbiorcaEdit">Polka</label>
+						</div>
+					</InputRadioGroup>
+				</div>
+				<div class="mb-3">
+					<label class="form-label fw-bold d-block">Przeznaczenie lokalizacji:</label>
+	
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" id="zalLOKI" @bind="ZALLoki">
+						<label class="form-check-label" for="zalLOKI">Czy załadunek?</label>
+					</div>
+	
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" id="rozLOKI" @bind="ROZLoki">
+						<label class="form-check-label" for="rozLOKI">Czy rozładunek?</label>
+					</div>
+				</div>
+			</div>
+		  </div>
+		  <div class="modal-footer">
+			<button type="button" class="btn btn-secondary" @onclick="CloseModal">Zamknij</button>
+			<button type="button" class="btn btn-primary" @onclick="EditLOK">Zmień</button>
+		  </div>
+		</div>
+	  </div>
+	</div>
+}
+
+@if (isModalOpenDEL){
+	<div class="modal" tabindex="-1" style="display: block; background-color: rgba(0,0,0,0.5);">
+	  <div class="modal-dialog">
+		<div class="modal-content">
+		  <div class="modal-header">
+			<h5 class="modal-title">USUŃ Lokalizacje</h5>
+			<button type="button" class="btn-close" aria-label="Close" @onclick="CloseModal"></button>
+		  </div>
+		  <div class="modal-body">
+			<div class="form-row">
+			<div class="col">
+				<p>Wpisz ID lokalizacji, którą chcesz usunąć.</p>
+				<input type="text" class="form-control" @bind="usunID" placeholder="np. 1 lub 1,4,5,6,8">
+
+			</div>
+			</div>
+		  </div>
+		  <div class="modal-footer">
+			<button type="button" class="btn btn-secondary" @onclick="CloseModal">Zamknij</button>
+			<button type="button" class="btn btn-primary" @onclick="UsunLok">Usuń</button>
+		  </div>
+		</div>
+	  </div>
+	</div>
+}
+@if (LIMIT)
+{
+	<div class="modal" tabindex="-1" style="display: block; background-color: rgba(0,0,0,0.5);">
+		<div class="modal-dialog modal-dialog-centered">
+			<div class="modal-content">
+				<div class="modal-header bg-danger text-white">
+					<h5 class="modal-title">PRZEKROCZONO LIMIT</h5>
+					<button type="button" class="btn-close btn-close-white" aria-label="Close" @onclick="CloseModalLIMIT"></button>
+				</div>
+				<div class="modal-body text-start">
+					<p class="mb-2">
+						Przekroczono limit <strong>@(magazynINFO?.MaksLokalizacji) lokalizacji</strong> w magazynie <strong>@(magazynINFO?.Nazwa)</strong>!
+					</p>
+					<p class="mb-0 text-muted">
+						Spróbuj usunąć lub zmodyfikować inną lokalizację albo zmienić limit lokalizacji w magazynie.
+					</p>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-secondary" @onclick="CloseModalLIMIT">Zamknij</button>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+
+@code{
+	private bool isModalOpen = false;
+	private bool isModalOpenEDIT = false;
+	private bool isModalOpenDEL = false;
+	private bool LIMIT = false;
+
+	private string nowaNazwa = string.Empty;
+	private string nowyOpis = string.Empty;
+	private string usunID = string.Empty;
+	private int dodajIDMag = 0;
+	private int WyswietlID = 0;
+	private int editID = 0;
+	private bool wybranyTyp = false;	// czy podloga czy polka
+
+	private bool ZALLoki = false;
+	private bool ROZLoki = false;
+
+
+	private List<Lokalizacja>? Loki;
+	private List<Magazyn>? Mags;
+	private Magazyn? magazynINFO;
+
+	private void OpenModalADD()
+	{
+		isModalOpen = true;
+		dodajIDMag = WyswietlID;
+	}
+	private void OpenModalEDIT()
+	{
+		isModalOpenEDIT = true;
+	}
+	private void OpenModalDEL()
+	{
+		isModalOpenDEL = true;
+	}
+	private void CloseModal()
+	{
+		isModalOpen = false;
+		isModalOpenDEL = false;
+		isModalOpenEDIT = false;
+	}
+	private void CloseModalLIMIT()
+	{
+		// isModalOpen = false;
+		LIMIT = false;
+	}
+
+
+
+	protected override async Task OnInitializedAsync()
+	{
+		await RefreshList();
+	}
+
+	protected async Task RefreshList()
+	{
+		if (WyswietlID == 0)
+		{
+			var rezultat = await LokalizacjaRepository.GetAllAsync();
+			Loki = rezultat.ToList();
+		}
+		else
+		{
+			var rezultat = await LokalizacjaRepository.GetByMagazynIdAsync(WyswietlID);
+			Loki = rezultat.ToList();
+		}
+		var rezultatM = await MagazynRepository.GetAllAsync();
+		Mags = rezultatM.ToList();
+	}
+
+	private async Task DodajLok()
+	{
+		if (string.IsNullOrWhiteSpace(nowaNazwa))
+			return;
+		magazynINFO = await MagazynRepository.GetByIdAsync(dodajIDMag);
+		var magazyn = await LokalizacjaRepository.GetByMagazynIdAsync(dodajIDMag);
+		if (magazynINFO.MaksLokalizacji > 0 && magazyn.Count >= magazynINFO.MaksLokalizacji)
+		{
+			isModalOpen = false;
+			LIMIT = true;
+			return;
+		}
+
+		var nowyLokalizacja = new Lokalizacja
+		{
+			Nazwa = nowaNazwa,
+			Opis = nowyOpis,
+			MagazynId = dodajIDMag,
+			Typ = wybranyTyp ? MagazynApp.Domain.Enums.TypLokalizacja.Podloga : MagazynApp.Domain.Enums.TypLokalizacja.Polka,
+			CzyZaladunek = ZALLoki,
+			CzyRozladunek = ROZLoki
+		};
+
+		await LokalizacjaRepository.AddAsync(nowyLokalizacja);
+
+		nowaNazwa = string.Empty;
+		nowyOpis = string.Empty;
+		isModalOpen = false;
+		await RefreshList();
+
+	}
+
+	private async Task EditLOK()
+	{
+		var EDITloka = (await LokalizacjaRepository.GetByIdAsync(editID));
+		if (EDITloka == null)
+		{
+			isModalOpenEDIT = false;
+			return;
+		}
+
+		EDITloka.Nazwa = nowaNazwa;
+		EDITloka.Opis = nowyOpis;
+		EDITloka.Typ = wybranyTyp ? MagazynApp.Domain.Enums.TypLokalizacja.Podloga : MagazynApp.Domain.Enums.TypLokalizacja.Polka;
+		EDITloka.CzyZaladunek = ZALLoki;
+		EDITloka.CzyRozladunek = ROZLoki;
+
+
+		await LokalizacjaRepository.UpdateAsync(EDITloka);
+
+		nowaNazwa = string.Empty;
+		nowyOpis = string.Empty;
+		wybranyTyp = false;
+		ZALLoki = false;
+		ROZLoki = false;
+		isModalOpenEDIT = false;
+		await RefreshList();
+
+	}
+
+	private async Task UsunLok()
+	{
+		if (string.IsNullOrWhiteSpace(usunID))
+			return;
+
+		var listaId = usunID
+			.Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries)
+			.Select(s => int.TryParse(s.Trim(), out int id) ? id : (int?)null)
+			.Where(id => id.HasValue && id > 0)
+			.Select(id => id!.Value)
+			.Distinct()
+			.ToList();
+
+		foreach (var id in listaId)
+		{
+			// var LokDoUsun = await LokalizacjaRepository.GetByIdAsync(id);
+			await LokalizacjaRepository.DeleteAsync(id);
+		}
+		isModalOpenDEL = false;
+		await RefreshList();
+		usunID = string.Empty;
+	}
+
+
+	private async Task OnMagazynSelected(ChangeEventArgs e)
+	{
+		if (int.TryParse(e.Value?.ToString(), out int selectedId))
+		{
+			WyswietlID = selectedId;
+			await RefreshList();
+		}
+	}
+	private void OnMagazynSelectedMODAL(ChangeEventArgs e)
+	{
+		if (int.TryParse(e.Value?.ToString(), out int selectedId))
+		{
+			dodajIDMag = selectedId;
+		}
+	}
+
+	private async Task OnLokalizacjaSelectedMODAL(ChangeEventArgs e)
+	{
+		if (int.TryParse(e.Value?.ToString(), out int selectedId))
+		{
+			editID = selectedId;
+		}
+		var lokEDIT = await LokalizacjaRepository.GetByIdAsync(editID);
+		if (lokEDIT != null)
+		{
+			nowaNazwa = lokEDIT.Nazwa;
+			nowyOpis = lokEDIT.Opis;
+			wybranyTyp = (lokEDIT.Typ == MagazynApp.Domain.Enums.TypLokalizacja.Podloga) ? true : false;
+			ZALLoki = lokEDIT.CzyZaladunek;
+			ROZLoki = lokEDIT.CzyRozladunek;
+
+		}
+		else
+		{
+			nowaNazwa = string.Empty;
+			nowyOpis = string.Empty;
+			ZALLoki = false;
+			ROZLoki = false;
+		}
+	}
+}
+
+
+
+@if (Loki is null)
+{
+	<p><em>Ładowanie...</em></p>
+}
+else if (!Loki.Any())
+{
+	<div class="alert alert-info d-flex fw-bold mt-3">
+		Brak zdefiniowanych lokalizacji dla wybranego magazynu.
+	</div>
+}
+else
+{
+	<table class="table table-bordered">
+		<thead>
+			<tr>
+				<th>Id magazynu</th>
+				<th>Id</th>
+				<th>Nazwa</th>
+				<th>Typ lokalizacji</th>
+				<th>Czy na załadunek</th>
+				<th>Czy na rozładunek</th>
+				<th>Opis</th>
+			</tr>
+		</thead>
+		<tbody>
+			@foreach (var lokaloka in Loki)
+			{
+				<tr>
+					<td>@lokaloka.MagazynId</td>
+					<td>@lokaloka.Id</td>
+					<td>@lokaloka.Nazwa</td>
+					<td>@lokaloka.Typ</td>
+					<td>@lokaloka.CzyZaladunek</td>
+					<td>@lokaloka.CzyRozladunek</td>
+					<td>@lokaloka.Opis</td>
+				</tr>
+			}
+		</tbody>
+	</table>
+}

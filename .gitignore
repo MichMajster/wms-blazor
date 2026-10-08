@@ -1,0 +1,60 @@
+## ==========================================
+## Build, Publish & Runtime Artifacts (.NET)
+## ==========================================
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+publish/
+[Zz]ip/
+
+## ==========================================
+## User-specific & IDE files (Visual Studio)
+## ==========================================
+.vs/
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+*.userprefs
+
+## ==========================================
+## Visual Studio Code
+## ==========================================
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+## ==========================================
+## JetBrains Rider
+## ==========================================
+.idea/
+*.sln.iml
+
+## ==========================================
+## Entity Framework & Database Local Files
+## ==========================================
+*.db
+*.db-shm
+*.db-wal
+*.sqlt
+*.mdf
+*.ldf
+
+## ==========================================
+## Secrets, Environment & Local Settings
+## ==========================================
+appsettings.Development.json
+appsettings.Local.json
+*.secrets.json
+.env
+
+## ==========================================
+## OS & System Files
+## ==========================================
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,356 @@
+﻿@page "/magazyny"
+@* @attribute [Authorize(Roles = "Admin, Manager")]
+@using Microsoft.AspNetCore.Authorization *@
+
+@using MagazynApp.Application.Interfaces;
+@using MagazynApp.Domain.Entities
+@inject IMagazynRepository MagazynRepository
+@rendermode InteractiveServer
+@* @attribute [Authorize(Roles = "Admin, Manager")] *@
+@* <!-- Przycisk widoczny dla każdego zalogowanego -->
+<AuthorizeView>
+    <Authorized>
+        <p>Zalogowany jako: @context.User.Identity?.Name</p>
+    </Authorized>
+    <NotAuthorized>
+        <p>Proszę się zalogować.</p>
+    </NotAuthorized>
+</AuthorizeView>
+
+<!-- Przycisk dodawania magazynu widoczny TYLKO dla Admina -->
+<AuthorizeView Roles="Admin">
+    <Authorized>
+        <button class="btn btn-success" @onclick="OtworzModalDodawania">
+            + Dodaj nowy magazyn
+        </button>
+    </Authorized>
+</AuthorizeView> *@
+
+
+<PageTitle>MAGAZYNY</PageTitle>
+<h3>TU JEST INFO O MAGAZYNACH</h3>
+@if (Mags == null){
+	<p>Ładowanie...</p>
+}
+else
+{
+	<p>Wszystkich magazynów jest: <strong>@Mags.Count</strong></p>
+}
+<div class="form-col mb-3">
+	<button type="button" class="btn btn-primary" @onclick="OpenModalADD">
+	  Dodaj Magazyn
+	</button>
+	<AuthorizeView Roles="Admin">
+    <Authorized>
+		<button type="button" class="btn btn-secondary" @onclick="OpenModalEDIT">
+		  Edytuj Magazyn
+		</button>
+	</Authorized>
+	</AuthorizeView>
+	<button type="button" class="btn btn-secondary" @onclick="OpenModalDEL">
+	  Usuń Magazyn
+	</button>
+	<br />
+</div>
+
+@if (isModalOpen){
+	<div class="modal" tabindex="-1" style="display: block; background-color: rgba(0,0,0,0.5);">
+	  <div class="modal-dialog">
+		<div class="modal-content">
+		  <div class="modal-header">
+			<h5 class="modal-title">DODAJ MAGAZYN</h5>
+			<button type="button" class="btn-close" aria-label="Close" @onclick="CloseModal"></button>
+		  </div>
+		  <div class="modal-body">
+			<div class="form-row">
+				<div class="col mb-3">
+					<input type="text" class="form-control" @bind="nowaNazwa" placeholder="Nazwa magazynu">
+				</div>
+				<div class="col mb-3">
+					<input type="text" class="form-control" @bind="nowyOpis" placeholder="Opis magazynu">
+				</div>
+				<div class="mb-3">
+				<input class="form-check-input" type="checkbox" id="autoLOKI" @bind="wygenerujLoki">
+				<label class="form-check-label" for="autoLOKI">Czy wygenerować automatycznie lokalizacje w magazynie?</label>
+				</div>
+
+				@if (wygenerujLoki)
+				{
+					<div class="col">
+						<label>Ile powinno być miejsc w magazynie?</label>
+						<input type="int" class="form-control" @bind="nowyMaks" placeholder="np. 1000">
+					</div>
+					<div class="col">
+						<label>Na ile sektorów powinien dzielić się magazyn?</label>
+						<input type="int" class="form-control" @bind="nowyIleSek" placeholder="czyli miejsca_w_magazynie / x">
+					</div>
+					<div>
+					Czyli 1 sektor będzie zawierał @nowyIleLOK_SEK lokalizacji.
+					</div>
+					<div class="col mb-3">
+						<label>Ile lokalizacji w sektorach znajduje się na podłodze?</label>
+						<input type="int" class="form-control" @bind="nowyPODLOGAwSEK" placeholder="czyli wszystkich * ilość_sektorów">
+					</div>
+					<p>Czyli łącznie będzie @nowyIlePODLOGA_LACZNIE lokalizacji na podłodze i @nowyIlePOLKA_LACZNIE na półce.</p>
+				}
+
+			</div>
+
+		  </div>
+		  <div class="modal-footer">
+			<button type="button" class="btn btn-secondary" @onclick="CloseModal">Zamknij</button>
+			<button type="button" class="btn btn-primary" @onclick="DodajMag">Dodaj</button>
+		  </div>
+		</div>
+	  </div>
+	</div>
+}
+
+@if (isModalOpenEDIT){
+	<div class="modal" tabindex="-1" style="display: block; background-color: rgba(0,0,0,0.5);">
+	  <div class="modal-dialog">
+		<div class="modal-content">
+		  <div class="modal-header">
+			<h5 class="modal-title">EDYTUJ MAGAZYN</h5>
+			<button type="button" class="btn-close" aria-label="Close" @onclick="CloseModal"></button>
+		  </div>
+		  <div class="modal-body">
+			  	<div class="col-auto ms-auto d-flex align-items-center gap-2 mb-3">
+					<label class="form-label mb-0 fw-bold text-nowrap">Wybierz magazyn:</label>
+					<select class="form-select" @onchange="OnMagazynSelectedMODAL">
+						<option value="0">Wybierz magazyn</option>
+						@if (Mags != null)
+						{
+							@foreach (var mag in Mags)
+							{
+								<option value="@mag.Id">ID: @mag.Id (@mag.Nazwa)</option>
+							}
+						}
+					</select>
+				</div>
+			<div class="form-row mb-3">
+				<div class="mb-3">
+					<input type="text" class="form-control" @bind="nowaNazwa" placeholder="Nazwa magazynu">
+				</div>
+				<div class="mb-3">
+					<input type="text" class="form-control" @bind="nowyOpis" placeholder="Opis magazynu">
+				</div>
+				<div class="mb-3">
+					<label class="form-label fw-bold d-block">Maksymalna liczba lokalizacji:</label>
+					<input type="int" class="form-control" @bind="nowyMaks" placeholder="Liczba miejsc w magazynie">
+				</div>
+			</div>
+		  </div>
+		  <div class="modal-footer">
+			<button type="button" class="btn btn-secondary" @onclick="CloseModal">Zamknij</button>
+			<button type="button" class="btn btn-primary" @onclick="EditMag">Zmień</button>
+		  </div>
+		</div>
+	  </div>
+	</div>
+}
+
+@if (isModalOpenDEL){
+	<div class="modal" tabindex="-1" style="display: block; background-color: rgba(0,0,0,0.5);">
+	  <div class="modal-dialog">
+		<div class="modal-content">
+		  <div class="modal-header">
+			<h5 class="modal-title">USUŃ MAGAZYN</h5>
+			<button type="button" class="btn-close" aria-label="Close" @onclick="CloseModal"></button>
+		  </div>
+		  <div class="modal-body">
+			<div class="form-row">
+			<div class="col">
+				<p>Wpisz ID magazynu, który chcesz usunąć.</p>
+				<input type="int" class="form-control" @bind="usunID" placeholder="ID magazynu">
+			</div>
+			</div>
+		  </div>
+		  <div class="modal-footer">
+			<button type="button" class="btn btn-secondary" @onclick="CloseModal">Zamknij</button>
+			<button type="button" class="btn btn-primary" @onclick="UsunMag">Usuń</button>
+		  </div>
+		</div>
+	  </div>
+	</div>
+}
+
+
+@code{
+	private bool isModalOpen = false;
+	private bool isModalOpenEDIT = false;
+	private bool isModalOpenDEL = false;
+	private bool wygenerujLoki = false;
+
+	private string nowaNazwa = string.Empty;
+	private string nowyOpis = string.Empty;
+	private int nowyMaks = 0;
+	private int nowyIleSek = 0;
+	private int nowyPODLOGAwSEK = 0;
+	private int usunID = 0;
+	private int editID = 0;
+	private int nowyIleLOK_SEK => nowyIleSek > 0 ? nowyMaks / nowyIleSek : 0;
+	private int nowyIlePODLOGA_LACZNIE => nowyPODLOGAwSEK > 0 ? nowyPODLOGAwSEK * nowyIleSek : 0;
+	private int nowyIlePOLKA_LACZNIE => nowyIlePODLOGA_LACZNIE > 0 ? nowyMaks - nowyIlePODLOGA_LACZNIE : 0;
+	private List<Magazyn>? Mags;
+
+
+	private void OpenModalADD()
+	{
+		isModalOpen = true;
+	}
+
+	private void OpenModalEDIT()
+	{
+		isModalOpenEDIT = true;
+	}
+
+	private void OpenModalDEL()
+	{
+		isModalOpenDEL = true;
+	}
+
+	private void CloseModal()
+	{
+		isModalOpen = false;
+		isModalOpenEDIT = false;
+		isModalOpenDEL = false;
+	}
+
+
+
+	protected override async Task OnInitializedAsync()
+	{
+		await RefreshList();
+	}
+
+	protected async Task RefreshList()
+	{
+		var rezultat = await MagazynRepository.GetAllAsync();
+		Mags = rezultat.ToList();
+	}
+
+	private async Task DodajMag()
+	{
+		if (string.IsNullOrWhiteSpace(nowaNazwa))
+			return;
+
+		var nowyMagazyn = new Magazyn
+		{
+			Nazwa = nowaNazwa,
+			Opis = nowyOpis,
+			MaksLokalizacji = wygenerujLoki ? nowyMaks : 0
+		};
+		if (wygenerujLoki)
+		{
+			var lokalizacje = MagazynRepository.GenerujLokalizacje(0, nowyMaks, nowyIleLOK_SEK, nowyPODLOGAwSEK);
+			nowyMagazyn.Lokalizacje = lokalizacje;
+		}
+
+		await MagazynRepository.AddAsync(nowyMagazyn);
+
+		nowaNazwa = string.Empty;
+		nowyOpis = string.Empty;
+		isModalOpen = false;
+		wygenerujLoki = false;
+		nowyMaks = 0;
+		nowyIleSek = 0;
+		nowyPODLOGAwSEK = 0;
+		await RefreshList();
+
+	}
+
+	private async Task EditMag()
+	{
+		if (string.IsNullOrWhiteSpace(nowaNazwa) || editID <= 0)
+			return;
+
+		var magToEdit = await MagazynRepository.GetByIdAsync(editID);
+		if (magToEdit == null)
+			return;
+
+		magToEdit.Nazwa = nowaNazwa;
+		magToEdit.Opis = nowyOpis;
+		magToEdit.MaksLokalizacji = nowyMaks;
+		await MagazynRepository.UpdateAsync(magToEdit);
+
+		nowaNazwa = string.Empty;
+		nowyOpis = string.Empty;
+		nowyMaks = 0;
+		editID = 0;
+		isModalOpenEDIT = false;
+		await RefreshList();
+
+	}
+
+	private async Task UsunMag()
+	{
+		if (usunID <= 0)
+			return;
+		var MagDoUsun = await MagazynRepository.GetByIdAsync(usunID);
+
+		if (MagDoUsun == null)
+		{
+			return;
+		}
+
+		await MagazynRepository.DeleteAsync(usunID);
+		isModalOpenDEL = false;
+		usunID = 0;
+		await RefreshList();
+
+	}
+
+	private async Task OnMagazynSelectedMODAL(ChangeEventArgs e)
+	{
+		if (int.TryParse(e.Value?.ToString(), out int selectedId))
+		{
+			editID = selectedId;
+		}
+		var magEdit = await MagazynRepository.GetByIdAsync(editID);
+		if (magEdit != null)
+		{
+			nowaNazwa = magEdit.Nazwa;
+			nowyOpis = magEdit.Opis;
+			nowyMaks = magEdit.MaksLokalizacji;
+		}
+		else
+		{
+			nowaNazwa = string.Empty;
+			nowyOpis = string.Empty;
+			nowyMaks = 0;
+		}
+	}
+}
+
+
+@if (Mags is null)
+{
+	<p><em>Ładowanie...</em></p>
+}
+else
+{
+	<table class="table table-bordered">
+		<thead>
+			<tr>
+				<th>Id</th>
+				<th>Nazwa</th>
+				<th>Opis</th>
+				<th>Maks lokalizacji</th>
+				<th>Ile teraz lokalizacji</th>
+			</tr>
+		</thead>
+		<tbody>
+			@foreach (var mag in Mags)
+			{
+				<tr>
+					<td>@mag.Id</td>
+					<td>@mag.Nazwa</td>
+					<td>@mag.Opis</td>
+					<td>@mag.MaksLokalizacji</td>
+					<td>@mag.Lokalizacje.Count</td>
+				</tr>
+			}
+		</tbody>
+	</table>
+}

@@ -1,0 +1,55 @@
+﻿@page "/"
+@using MagazynApp.Application.Interfaces;
+@using MagazynApp.Domain.Entities
+@inject IMagazynRepository MagazynRepository
+@inject IPrzedmiotRepository PrzedmiotRepository
+@inject ILokalizacjaRepository LokalizacjaRepository
+@inject IKontrahentRepository KontrahentRepository
+@using MagazynApp.Infrastructure.Services
+@inject AuthService AuthService
+@rendermode InteractiveServer
+@using System.Text.RegularExpressions;
+
+<PageTitle>Home</PageTitle>
+
+<h1>Witajcie, magazyny!</h1>
+
+@if (Mags == null){<p>Ładowanie...</p>}
+else{<p>Wszystkich magazynów jest: <strong>@Mags.Count</strong></p>}
+@if (Loki == null){<p>Ładowanie...</p>}
+else{<p>Wszystkich lokalizacji jest: <strong>@Loki.Count</strong></p>}
+
+<AuthorizeView Roles="Admin, Manager">
+<Authorized>
+@if (Przeds == null){<p>Ładowanie...</p>}
+else{<p>Wszystkich przedmiotów jest: <strong>@Przeds.Count</strong></p>}
+@if (Konty == null){<p>Ładowanie...</p>}
+else{<p>Wszystkich kontrahentów jest: <strong>@Konty.Count</strong></p>}
+@if (Userzy == null){<p>Ładowanie...</p>}
+else{<p>Wszystkich kontrahentów jest: <strong>@Userzy.Count</strong></p>}
+</Authorized>
+</AuthorizeView>
+
+
+@code{
+	private List<Przedmiot>? Przeds;
+	private List<Magazyn>? Mags;
+	private List<Lokalizacja>? Loki;
+	private List<Kontrahent>? Konty;
+	private List<User>? Userzy;
+
+	protected override async Task OnInitializedAsync()
+	{
+		await RefreshList();
+	}
+
+	protected async Task RefreshList()
+	{
+		Przeds = (await PrzedmiotRepository.GetAllAsync()).ToList();
+		Loki = (await LokalizacjaRepository.GetAllAsync()).ToList();
+		Mags = (await MagazynRepository.GetAllAsync()).ToList();
+		Konty = (await KontrahentRepository.GetAllAsync()).ToList();
+		Userzy = (await AuthService.GetAllUsersAsync()).ToList();
+
+	}
+}

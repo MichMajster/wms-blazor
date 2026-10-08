@@ -1,0 +1,318 @@
+﻿@page "/users"
+@* @attribute [Authorize(Roles = "Admin, Manager")]
+@using Microsoft.AspNetCore.Authorization *@
+
+@using MagazynApp.Application.Interfaces;
+@using MagazynApp.Domain.Entities
+@using MagazynApp.Infrastructure.Services
+@inject AuthService AuthService
+@rendermode InteractiveServer
+
+<PageTitle>UŻYTKOWNICY</PageTitle>
+<h3>ZARZĄDZANIE UŻYTKOWNIKAMI</h3>
+<AuthorizeView Roles="Admin, Manager">
+<Authorized>
+@if (Userzy == null){
+	<p>Ładowanie...</p>
+}
+else
+{
+	<p>Wszystkich użytkowników jest: <strong>@Userzy.Count</strong></p>
+}
+
+<div class="form-col mb-3">
+	<button type="button" class="btn btn-primary" @onclick="OpenModalADD">
+	  Dodaj Użytkownika
+	</button>
+	@* <AuthorizeView Roles="Admin">
+    <Authorized> *@
+	<button type="button" class="btn btn-secondary" @onclick="OpenModalEDIT">
+	  Edytuj Użytkownika
+	</button>
+	@* </Authorized>
+	</AuthorizeView> *@
+	<button type="button" class="btn btn-secondary" @onclick="OpenModalDEL">
+	  Usuń Użytkownika
+	</button>
+	<br />
+</div>
+
+@if (isModalOpen){
+	<div class="modal" tabindex="-1" style="display: block; background-color: rgba(0,0,0,0.5);">
+	  <div class="modal-dialog">
+		<div class="modal-content">
+		  <div class="modal-header">
+			<h5 class="modal-title">DODAJ UŻYTKOWNIKA</h5>
+			<button type="button" class="btn-close" aria-label="Close" @onclick="CloseModal"></button>
+		  </div>
+		  <div class="modal-body">
+			<div class="form-row">
+				<div class="col mb-3">
+					<input type="text" class="form-control" @bind="nowaUsername" placeholder="Nazwa użytkownika">
+				</div>
+				<div class="col mb-3">
+					<input type="password" class="form-control" @bind="noweHaslo" placeholder="Hasło">
+				</div>
+				<div class="col mb-3">
+					<label class="form-label fw-bold">Rola:</label>
+					<select class="form-select" @bind="nowaRola">
+						<option value="User">User</option>
+						<option value="Manager">Manager</option>
+						<option value="Admin">Admin</option>
+					</select>
+				</div>
+			</div>
+		  </div>
+		  <div class="modal-footer">
+			<button type="button" class="btn btn-secondary" @onclick="CloseModal">Zamknij</button>
+			<button type="button" class="btn btn-primary" @onclick="DodajUser">Dodaj</button>
+		  </div>
+		</div>
+	  </div>
+	</div>
+}
+
+@if (isModalOpenEDIT){
+	<div class="modal" tabindex="-1" style="display: block; background-color: rgba(0,0,0,0.5);">
+	  <div class="modal-dialog">
+		<div class="modal-content">
+		  <div class="modal-header">
+			<h5 class="modal-title">EDYTUJ UŻYTKOWNIKA</h5>
+			<button type="button" class="btn-close" aria-label="Close" @onclick="CloseModal"></button>
+		  </div>
+		  <div class="modal-body">
+			<div class="col-auto ms-auto d-flex align-items-center gap-2 mb-3">
+				<label class="form-label mb-0 fw-bold text-nowrap">Wybierz użytkownika:</label>
+				<select class="form-select" @onchange="OnUserSelectedMODAL">
+					<option value="0">Wybierz użytkownika</option>
+					@if (Userzy != null)
+					{
+						@foreach (var user in Userzy)
+						{
+							<option value="@user.Id">ID: @user.Id (@user.Username)</option>
+						}
+					}
+				</select>
+			</div>
+			<div class="form-row mb-3">
+				<div class="mb-3">
+					<input type="text" class="form-control" @bind="nowaUsername" placeholder="Nazwa użytkownika">
+				</div>
+				<div class="mb-3">
+				<input class="form-check-input" type="checkbox" id="autoLOKI" @bind="isNowaNazUz">
+				<label class="form-check-label" for="autoLOKI">Czy chcesz zmienić nazwę użytkownika?</label>
+				@if (isNowaNazUz){
+					<div class="mb-3">
+						<input type="text" class="form-control" @bind="nowa2Username" placeholder="Nowa nazwa użytkownika">
+					</div>
+				}
+				</div>
+				<div class="mb-3">
+					<input type="password" class="form-control" @bind="noweHaslo" placeholder="Nowe hasło (opcjonalnie)">
+				</div>
+				<div class="mb-3">
+					<label class="form-label fw-bold">Rola:</label>
+					<select class="form-select" @bind="nowaRola">
+						<option value="User">User</option>
+						<option value="Manager">Manager</option>
+						<option value="Admin">Admin</option>
+					</select>
+				</div>
+			</div>
+		  </div>
+		  <div class="modal-footer">
+			<button type="button" class="btn btn-secondary" @onclick="CloseModal">Zamknij</button>
+			<button type="button" class="btn btn-primary" @onclick="EditUser">Zmień</button>
+		  </div>
+		</div>
+	  </div>
+	</div>
+}
+
+@if (isModalOpenDEL){
+	<div class="modal" tabindex="-1" style="display: block; background-color: rgba(0,0,0,0.5);">
+	  <div class="modal-dialog">
+		<div class="modal-content">
+		  <div class="modal-header">
+			<h5 class="modal-title">USUŃ UŻYTKOWNIKA</h5>
+			<button type="button" class="btn-close" aria-label="Close" @onclick="CloseModal"></button>
+		  </div>
+		  <div class="modal-body">
+			<div class="form-row">
+			<div class="col">
+				<p>Wpisz ID użytkownika, który chcesz usunąć.</p>
+				<input type="int" class="form-control" @bind="usunID" placeholder="ID użytkownika">
+			</div>
+			</div>
+		  </div>
+		  <div class="modal-footer">
+			<button type="button" class="btn btn-secondary" @onclick="CloseModal">Zamknij</button>
+			<button type="button" class="btn btn-primary" @onclick="UsunUser">Usuń</button>
+		  </div>
+		</div>
+	  </div>
+	</div>
+}
+</Authorized>
+</AuthorizeView>
+@code{
+	private bool isModalOpen = false;
+	private bool isModalOpenEDIT = false;
+	private bool isModalOpenDEL = false;
+	private bool isNowaNazUz = false;
+
+	private string nowaUsername = string.Empty;
+	private string nowa2Username = string.Empty;
+	private string noweHaslo = string.Empty;
+	private string nowaRola = "User";
+	private int usunID = 0;
+	private int editID = 0;
+	private List<User>? Userzy;
+
+	private void OpenModalADD()
+	{
+		isModalOpen = true;
+		ClearFormFields();
+	}
+
+	private void OpenModalEDIT()
+	{
+		isModalOpenEDIT = true;
+	}
+
+	private void OpenModalDEL()
+	{
+		isModalOpenDEL = true;
+	}
+
+	private void CloseModal()
+	{
+		isModalOpen = false;
+		isModalOpenEDIT = false;
+		isModalOpenDEL = false;
+		ClearFormFields();
+	}
+
+	private void ClearFormFields()
+	{
+		nowaUsername = string.Empty;
+		noweHaslo = string.Empty;
+		nowaRola = "User";
+		editID = 0;
+	}
+
+	// private void NowaNazwaUzytkownika()
+	// {
+	// 	isNowaNazUz = true;
+	// }
+
+	protected override async Task OnInitializedAsync()
+	{
+		await RefreshList();
+	}
+
+	protected async Task RefreshList()
+	{
+		Userzy = await AuthService.GetAllUsersAsync();
+	}
+
+	private async Task DodajUser()
+	{
+		if (string.IsNullOrWhiteSpace(nowaUsername) || string.IsNullOrWhiteSpace(noweHaslo))
+			return;
+
+		var wynik = await AuthService.RegisterAsync(nowaUsername, noweHaslo, nowaRola);
+
+		if (wynik)
+		{
+			ClearFormFields();
+			isModalOpen = false;
+			await RefreshList();
+		}
+	}
+
+	private async Task EditUser()
+	{
+		if (string.IsNullOrWhiteSpace(nowaUsername) || editID <= 0)
+			return;
+
+		await AuthService.EditAsync(nowaUsername, noweHaslo, nowaRola, nowa2Username);
+		ClearFormFields();
+		isModalOpenEDIT = false;
+		await RefreshList();
+	}
+
+	private async Task UsunUser()
+	{
+		if (usunID <= 0)
+			return;
+
+		await AuthService.DeleteAsync(usunID);
+		ClearFormFields();
+		isModalOpenDEL = false;
+		usunID = 0;
+		await RefreshList();
+	}
+
+	private async Task OnUserSelectedMODAL(ChangeEventArgs e)
+	{
+		if (int.TryParse(e.Value?.ToString(), out int selectedId))
+		{
+			editID = selectedId;
+		}
+		// Załaduj dane wybranego użytkownika
+		if (Userzy != null)
+		{
+			var user = Userzy.FirstOrDefault(u => u.Id == editID);
+			if (user != null)
+			{
+				nowaUsername = user.Username;
+				nowaRola = user.Role;
+				noweHaslo = string.Empty;
+			}
+			else
+			{
+				ClearFormFields();
+			}
+		}
+	}
+}
+
+<AuthorizeView Roles="Admin, Manager">
+<Authorized>
+@if (Userzy is null)
+{
+	<p><em>Ładowanie...</em></p>
+}
+else if (!Userzy.Any())
+{
+	<div class="alert alert-info d-flex fw-bold mt-3">
+		Brak zdefiniowanych użytkowników.
+	</div>
+}
+else
+{
+	<table class="table table-bordered">
+		<thead>
+			<tr>
+				<th>Id</th>
+				<th>Nazwa użytkownika</th>
+				<th>Rola</th>
+				<th>Hasło</th>
+			</tr>
+		</thead>
+		<tbody>
+			@foreach (var user in Userzy)
+			{
+				<tr>
+					<td>@user.Id</td>
+					<td>@user.Username</td>
+					<td>@user.Role</td>
+					<td>@user.PasswordH</td>
+				</tr>
+			}
+		</tbody>
+	</table>
+}
+</Authorized>
+</AuthorizeView>

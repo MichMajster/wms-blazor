@@ -1,0 +1,442 @@
+﻿
+@page "/przedmioty"
+@using MagazynApp.Application.Interfaces;
+@using MagazynApp.Domain.Entities
+@* @inject IMagazynRepository MagazynRepository *@
+@inject IPrzedmiotRepository PrzedmiotRepository
+@inject ILokalizacjaRepository LokalizacjaRepository
+@inject IMagazynRepository MagazynRepository
+@rendermode InteractiveServer
+@using System.Text.RegularExpressions;
+@using Microsoft.AspNetCore.Components.Authorization
+
+<PageTitle>PRZEDMIOTY</PageTitle>
+<h3>TU JEST INFO O PRZEDMIOTACH</h3>
+@if (Przeds == null){
+	<p>Ładowanie...</p>
+}
+else if(WyswietlID == 0)
+{
+	<p>Wszystkich przedmiotów jest: <strong>@Przeds.Count</strong></p>
+}
+
+else
+{
+	<p>Wszystkich przedmiotów w <strong>magazynie @WyswietlID</strong> jest: <strong>@Przeds.Count</strong></p>
+}
+<div class="row align-items-center g-2 mb-3">
+<AuthorizeView Roles="Admin, Manager">
+	<Authorized>
+		
+	<div class="col-auto">
+		<button type="button" class="btn btn-primary" @onclick="OpenModalADD">
+			Dodaj przedmiot
+		</button>
+	</div>
+	<div class="col-auto">
+		<button type="button" class="btn btn-secondary" @onclick="OpenModalEDIT">
+			Modyfikuj przedmiot
+		</button>
+	</div>
+	</Authorized>
+</AuthorizeView>
+<AuthorizeView Roles="Admin">
+	<Authorized>
+	<div class="col-auto">
+		<button type="button" class="btn btn-secondary" @onclick="OpenModalDEL">
+			Usuń przedmiot
+		</button>
+	</div>
+	</Authorized>
+</AuthorizeView>
+
+	<div class="col-auto ms-auto d-flex align-items-center gap-2">
+    <label class="form-label mb-0 fw-bold text-nowrap">Wybierz magazyn:</label>
+    <select class="form-select" @onchange="OnMagazynSelected">
+        <option value="0">-- Wszystkie magazyny --</option>
+        @if (Mags != null)
+        {
+            @foreach (var mag in Mags)
+            {
+                <option value="@mag.Id">ID: @mag.Id (@mag.Nazwa)</option>
+            }
+        }
+    </select>
+    </div>			
+</div>
+
+@if (isModalOpen){
+	<div class="modal" tabindex="-1" style="display: block; background-color: rgba(0,0,0,0.5);">
+	  <div class="modal-dialog">
+		<div class="modal-content">
+		  <div class="modal-header">
+			<h5 class="modal-title">DODAJ PRZEDMIOT</h5>
+			<button type="button" class="btn-close" aria-label="Close" @onclick="CloseModal"></button>
+		  </div>
+		  <div class="modal-body">
+			<div class="form-row">
+				<div class="col-auto ms-auto d-flex align-items-center gap-2 mb-3">
+					<label class="form-label mb-0 fw-bold text-nowrap">Wybierz magazyn:</label>
+					<select class="form-select" @onchange="OnMagazynSelectedMODAL">
+						<option value="0">Wybierz magazyn</option>
+						@if (Mags != null)
+						{
+							@foreach (var mag in Mags)
+							{
+								<option value="@mag.Id">ID: @mag.Id (@mag.Nazwa)</option>
+							}
+						}
+					</select>
+				</div>
+				<div class="col mb-3">
+					<input type="text" class="form-control" @bind="nowaNazwa" placeholder="Nazwa przedmiotu">
+				</div>
+				<div class="col mb-3">
+					<input type="text" class="form-control" @bind="nowyOpis" placeholder="Opis przedmiotu">
+				</div>
+				<div class="col mb-3">
+				<input class="form-check-input" type="checkbox" id="autoLOKI" @bind="wygenerujLoki">	
+					<label class="form-check-label" for="autoLOKI">Dodać identyczny przedmiot do wielu lokalizacji?</label>
+				</div>
+				@if (wygenerujLoki)
+				{
+					<div class="col mb-3">
+					<label for="ZAKRES">Wpisz zakres lokalizacji, gdzie chcesz dodać przedmioty</label>
+					<input type="text" class="form-control" id="ZAKRES" @bind="nowyZAKRES" placeholder="np. A001, B011">
+					</div>
+				}
+				else{
+					<div class="col mb-3">
+					<label for="lokalizacja">Wpisz lokalizację, gdzie chcesz dodać przedmiot</label>
+					<input type="text" class="form-control" id="lokalizacja" @bind="nowyZAKRES1" placeholder="np. A001">
+					</div>
+				}
+
+			</div>
+		  </div>
+		  <div class="modal-footer">
+			<button type="button" class="btn btn-secondary" @onclick="CloseModal">Zamknij</button>
+			<button type="button" class="btn btn-primary" @onclick="DodajPRZ">Dodaj</button>
+		  </div>
+		</div>
+	  </div>
+	</div>
+}
+
+@if (isModalOpenDEL){
+	<div class="modal" tabindex="-1" style="display: block; background-color: rgba(0,0,0,0.5);">
+	  <div class="modal-dialog">
+		<div class="modal-content">
+		  <div class="modal-header">
+			<h5 class="modal-title">USUŃ PRZEDMIOT</h5>
+			<button type="button" class="btn-close" aria-label="Close" @onclick="CloseModal"></button>
+		  </div>
+		  <div class="modal-body">
+			<div class="form-row">
+			<div class="col">
+				<p>Wpisz ID przedmiotu, który chcesz usunąć.</p>
+				<input type="int" class="form-control" @bind="usunID" placeholder="ID przedmiotu">
+			</div>
+			</div>
+
+		  </div>
+		  <div class="modal-footer">
+			<button type="button" class="btn btn-secondary" @onclick="CloseModal">Zamknij</button>
+			<button type="button" class="btn btn-primary" @onclick="UsunPrz">Usuń</button>
+		  </div>
+		</div>
+	  </div>
+	</div>
+}
+@if (isModalOpenEDIT){
+	<div class="modal" tabindex="-1" style="display: block; background-color: rgba(0,0,0,0.5);">
+	  <div class="modal-dialog">
+		<div class="modal-content">
+		  <div class="modal-header">
+			<h5 class="modal-title">MODYFIKUJ PRZEDMIOT</h5>
+			<button type="button" class="btn-close" aria-label="Close" @onclick="CloseModal"></button>
+		  </div>
+		  <div class="modal-body">
+			<div class="form-row">
+				<div class="col-auto ms-auto d-flex align-items-center gap-2 mb-3">
+					<label class="form-label mb-0 fw-bold text-nowrap">Wybierz przedmiot:</label>
+					<select class="form-select" @onchange="OnPrzedmiotSelectedMODAL">
+						<option value="0">Wybierz przedmiot</option>
+						@if (Przeds != null)
+						{
+							@foreach (var mag in Przeds)
+							{
+								<option value="@mag.Id">ID: @mag.Id (@mag.Nazwa)</option>
+							}
+						}
+					</select>
+				</div>
+				<div class="col mb-3">
+					<input type="text" class="form-control" @bind="nowaNazwa" placeholder="Nazwa przedmiotu">
+				</div>
+				<div class="col mb-3">
+					<input type="text" class="form-control" @bind="nowyOpis" placeholder="Opis przedmiotu">
+				</div>
+				<div class="col mb-3">
+					<input type="text" class="form-control" @bind="nowyIDdost" placeholder="ID dostawcy">
+				</div>
+				<div class="col mb-3">
+					<input type="text" class="form-control" @bind="nowyIDodbi" placeholder="ID odbiorcy">
+				</div>
+
+			</div>
+		  </div>
+		  <div class="modal-footer">
+			<button type="button" class="btn btn-secondary" @onclick="CloseModal">Zamknij</button>
+			<button type="button" class="btn btn-primary" @onclick="EditPRZ">Dodaj</button>
+		  </div>
+		</div>
+	  </div>
+	</div>
+}
+
+
+@code{
+	private bool isModalOpen = false;
+	private bool isModalOpenDEL = false;
+	private bool isModalOpenEDIT = false;
+
+	private bool wygenerujLoki = false;
+	private int WyswietlID = 0;
+
+	private string nowaNazwa = string.Empty;
+	private string nowyOpis = string.Empty;
+	private string nowyZAKRES = string.Empty;
+	private string nowyZAKRES1 = string.Empty;
+
+	private int usunID = 0;
+	private int dodajIDMag = 0;
+
+	private int? nowyIDdost = null;
+	private int? nowyIDodbi = null;
+
+	private List<Magazyn>? Mags;
+	// private List<Lokalizacja>? Loki;
+	private List<Przedmiot>? Przeds;
+
+
+	private void OpenModalADD()
+	{
+		isModalOpen = true;
+	}
+	private void OpenModalEDIT()
+	{
+		isModalOpenEDIT = true;
+	}
+	private void OpenModalDEL()
+	{
+		isModalOpenDEL = true;
+	}
+	private void CloseModal()
+	{
+		isModalOpen = false;
+		isModalOpenDEL = false;
+		isModalOpenEDIT = false;
+	}
+
+	private void OnMagazynSelectedMODAL(ChangeEventArgs e)
+	{
+		if (int.TryParse(e.Value?.ToString(), out int selectedId))
+		{
+			dodajIDMag = selectedId;
+		}
+	}
+	private async Task OnPrzedmiotSelectedMODAL(ChangeEventArgs e)
+	{
+		if (int.TryParse(e.Value?.ToString(), out int selectedId))
+		{
+			dodajIDMag = selectedId;
+		}
+		var przedmEDIT = await PrzedmiotRepository.GetByIdAsync(dodajIDMag);
+		if (przedmEDIT != null)
+		{
+			nowaNazwa = przedmEDIT.Nazwa;
+			nowyOpis = przedmEDIT.Opis;
+			nowyIDdost = przedmEDIT.DostawcaId;
+			nowyIDodbi = przedmEDIT.OdbiorcaId;
+		}
+		else
+		{
+			nowaNazwa = string.Empty;
+			nowyOpis = string.Empty;
+			nowyIDdost = null;
+			nowyIDodbi = null;
+		}
+	}
+
+	private async Task OnMagazynSelected(ChangeEventArgs e)
+	{
+		if (int.TryParse(e.Value?.ToString(), out int selectedId))
+		{
+			WyswietlID = selectedId;
+		}
+		await RefreshList();
+	}
+
+
+	protected override async Task OnInitializedAsync()
+	{
+		await RefreshList();
+	}
+
+	protected async Task RefreshList()
+	{
+		if (WyswietlID == 0)
+		{
+			var rezultat = await PrzedmiotRepository.GetAllAsync();
+			Przeds = rezultat.ToList();
+		}
+		else
+		{
+			var rezultat = await PrzedmiotRepository.GetByMagazynIdAsync(WyswietlID);
+			Przeds = rezultat.ToList();
+		}
+		// Przeds = (await PrzedmiotRepository.GetAllAsync()).ToList();
+		// Loki = (await LokalizacjaRepository.GetAllAsync()).ToList();
+		Mags = (await MagazynRepository.GetAllAsync()).ToList();
+
+	}
+
+	private async Task DodajPRZ()
+	{
+		if (string.IsNullOrWhiteSpace(nowaNazwa) && (string.IsNullOrWhiteSpace(nowyZAKRES) || (string.IsNullOrWhiteSpace(nowyZAKRES1))))
+			return;
+
+		if (!wygenerujLoki)
+		{
+			var nowyPrzedmiot = new Przedmiot
+				{
+					Nazwa = nowaNazwa,
+					Opis = nowyOpis,
+					LokalizacjaId = await LokalizacjaRepository.GetIdByNameAsync(nowyZAKRES1, dodajIDMag)
+
+			};
+			await PrzedmiotRepository.AddAsync(nowyPrzedmiot);
+		}
+		else
+		{
+			foreach (var lokalizacja in nowyZAKRES.Split(','))
+			{
+				var nowyPrzedmiot = new Przedmiot
+				{
+					Nazwa = nowaNazwa,
+					Opis = nowyOpis,
+					LokalizacjaId = await LokalizacjaRepository.GetIdByNameAsync(lokalizacja.Trim(), dodajIDMag)
+				};
+				await PrzedmiotRepository.AddAsync(nowyPrzedmiot);
+			}
+		}
+
+		nowaNazwa = string.Empty;
+		nowyOpis = string.Empty;
+		isModalOpen = false;
+		wygenerujLoki = false;
+		await RefreshList();
+
+	}
+
+	private async Task EditPRZ()
+	{
+		if (string.IsNullOrWhiteSpace(nowaNazwa) && (string.IsNullOrWhiteSpace(nowyZAKRES) || (string.IsNullOrWhiteSpace(nowyZAKRES1))))
+			return;
+
+		var EDITPrzedmiot = await PrzedmiotRepository.GetByIdAsync(dodajIDMag);
+		if (EDITPrzedmiot == null)
+		{
+			return;
+		}
+
+		EDITPrzedmiot.Nazwa = nowaNazwa;
+		EDITPrzedmiot.Opis = nowyOpis;
+		// LokalizacjaId = 
+		EDITPrzedmiot.DostawcaId = nowyIDdost;
+		EDITPrzedmiot.OdbiorcaId = nowyIDodbi;
+		await PrzedmiotRepository.UpdateAsync(EDITPrzedmiot);
+
+		nowaNazwa = string.Empty;
+		nowyOpis = string.Empty;
+		nowyIDdost = null;
+		nowyIDodbi = null;
+		isModalOpenEDIT = false;
+		await RefreshList();
+
+	}
+
+	private async Task UsunPrz()
+	{
+		if (usunID <= 0)
+			return;
+		var PrzDoUsun = await PrzedmiotRepository.GetByIdAsync(usunID);
+
+		if (PrzDoUsun == null)
+		{
+			return;
+		}
+
+		await PrzedmiotRepository.DeleteAsync(usunID);
+		isModalOpenDEL = false;
+		await RefreshList();
+
+	}
+
+
+
+
+
+
+}
+
+
+@if (Przeds is null)
+{
+	<p><em>Ładowanie...</em></p>
+}
+else
+{
+	<table class="table table-bordered">
+		<thead>
+			<tr>
+				<th>Id</th>
+				<th>Nazwa</th>
+				<th>Opis</th>
+				<th>Id lokalizacji</th>
+				<th>Id magazynu</th>
+				<th>Id dostawcy</th>
+				<AuthorizeView Roles="Admin, Manager">
+				<Authorized>
+				<th>Id odbiorcy</th>
+				</Authorized>
+				</AuthorizeView>
+			</tr>
+		</thead>
+		<tbody>
+			@foreach (var prz in Przeds)
+			{
+				<tr>
+					<td>@prz.Id</td>
+					<td>@prz.Nazwa</td>
+					<td>@prz.Opis</td>
+					<td>@prz.Lokalizacja?.Id (@prz.Lokalizacja?.Nazwa)</td>
+					<td>@prz.Lokalizacja?.MagazynId (@prz.Lokalizacja?.Magazyn.Nazwa)</td>
+					<td>@prz.DostawcaId (@(prz.Dostawca?.Nazwa ?? "brak"))</td>
+					<AuthorizeView Roles="Admin, Manager">
+					<Authorized>
+					<td>@prz.OdbiorcaId (@(prz.Odbiorca?.Nazwa ?? "brak"))</td>
+					</Authorized>
+					</AuthorizeView>
+				</tr>
+			}
+		</tbody>
+	</table>
+}
+
+
+	@* SPRAW BY PRZEDMIOT NIE MOGL MIEC TEGO SAMEGO ODBIORCE I DOSTAWCE (?)
+	BY MOZNA BYLO EDYTOWAC LOKALIZACJE
+	BY MOZNA BYLO PRZEGLADAC RZECZY DANEGO KONTRAHENTA. *@
+	@* (@prz.Dostawca.Nazwa) *@

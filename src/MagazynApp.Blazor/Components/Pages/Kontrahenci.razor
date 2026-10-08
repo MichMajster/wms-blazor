@@ -1,0 +1,412 @@
+﻿@page "/kontrahenci"
+@* @attribute [Authorize(Roles = "Admin, Manager")]
+@using Microsoft.AspNetCore.Authorization *@
+
+@using MagazynApp.Application.Interfaces;
+@using MagazynApp.Domain.Entities
+@inject IKontrahentRepository KontrahentRepository
+@inject IPrzedmiotRepository PrzedmiotRepository
+@rendermode InteractiveServer
+
+<PageTitle>KONTRAHENCI</PageTitle>
+<h3>TU JEST INFO O KONTRAHENTACH</h3>
+@if (Konty == null){
+	<p>Ładowanie...</p>
+}
+else
+{
+	<p>Wszystkich kontrahentów jest: <strong>@Konty.Count</strong></p>
+}
+<div class="form-col mb-3">
+	<button type="button" class="btn btn-primary" @onclick="OpenModalADD">
+	  Dodaj Kontrahenta
+	</button>
+	<button type="button" class="btn btn-secondary" @onclick="OpenModalEDIT">
+	  Edytuj Kontrahenta
+	</button>
+	<button type="button" class="btn btn-secondary" @onclick="OpenModalDEL">
+	  Usuń Kontrahenta
+	</button>
+	<br />
+</div>
+
+@if (isModalOpen){
+	<div class="modal" tabindex="-1" style="display: block; background-color: rgba(0,0,0,0.5);">
+	  <div class="modal-dialog">
+		<div class="modal-content">
+		  <div class="modal-header">
+			<h5 class="modal-title">DODAJ KONTRAHENTA</h5>
+			<button type="button" class="btn-close" aria-label="Close" @onclick="CloseModal"></button>
+		  </div>
+		  <div class="modal-body">
+			<div class="form-row mb-3">
+				<div class="mb-3">
+					<input type="text" class="form-control" @bind="nowaNazwa" placeholder="Nazwa kontrahenta">
+				</div>
+				<div class="mb-3">
+					<input type="text" class="form-control" @bind="nowyOpis" placeholder="Opis kontrahenta">
+				</div>
+				<div class="mb-3">
+					<label class="form-label fw-bold d-block">Rola kontrahenta:</label>
+					<InputRadioGroup @bind-Value="wybranyTyp">
+						<div class="form-check form-check-inline">
+							<InputRadio class="form-check-input" Value="true" id="radioDostawca" />
+							<label class="form-check-label" for="radioDostawca">Dostawca</label>
+						</div>
+						<div class="form-check form-check-inline">
+							<InputRadio class="form-check-input" Value="false" id="radioOdbiorca" />
+							<label class="form-check-label" for="radioOdbiorca">Odbiorca</label>
+						</div>
+					</InputRadioGroup>
+				</div>
+				<input class="form-check-input" type="checkbox" id="autoLOKI" @bind="wygenerujLoki">
+				<label class="form-check-label" for="autoLOKI">Czy przypisać przedmioty do tego kontrahenta?</label>
+
+
+				@if (wygenerujLoki)
+				{
+					<div class="d-flex flex-column gap-2 border p-3 rounded bg-light">
+						<label class="form-label fw-bold mb-1">Wybierz przedmioty:</label>
+    
+						@if (Przeds != null && Przeds.Any())
+						{
+							@foreach (var prz in Przeds)
+							{
+								<div class="form-check">
+									<input class="form-check-input" 
+										   type="checkbox" 
+										   id="prz_@prz.Id" 
+										   checked="@wybraneIdPrzedmiotow.Contains(prz.Id)"
+										   @onchange="(e) => OnPrzedmiotCheckboxChanged(prz.Id, e.Value)" />
+                       
+									<label class="form-check-label" for="prz_@prz.Id">
+										ID: @prz.Id (@prz.Nazwa)
+										<div class="d-flex small text-muted">
+											<span style="width: 160px; white-space: nowrap; display: inline-block;">
+												Dostawca: 
+												@if (prz.DostawcaId.HasValue)
+												{
+													<strong>@prz.DostawcaId</strong>
+												}
+												else
+												{
+													<span>Brak</span>
+												}
+											</span>
+
+											<span style="white-space: nowrap;">
+												Odbiorca: 
+												@if (prz.OdbiorcaId.HasValue)
+												{
+													<strong>@prz.OdbiorcaId</strong>
+												}
+												else
+												{
+													<span>Brak</span>
+												}
+											</span>
+										</div>
+									</label>
+								</div>
+							}
+						}
+						else
+						{
+							<span class="text-muted small">Brak dostępnych magazynów</span>
+						}
+					</div>
+				}
+
+			</div>
+			@* <button type="submit" class="btn btn-primary" @onclick="SaveChangesModal">Dodaj</button> *@
+
+			@* <p>Modal body text goes here.</p> *@
+		  </div>
+		  <div class="modal-footer">
+			<button type="button" class="btn btn-secondary" @onclick="CloseModal">Zamknij</button>
+			<button type="button" class="btn btn-primary" @onclick="AddKONTA">Dodaj</button>
+		  </div>
+		</div>
+	  </div>
+	</div>
+}
+
+@if (isModalOpenEDIT){
+	<div class="modal" tabindex="-1" style="display: block; background-color: rgba(0,0,0,0.5);">
+	  <div class="modal-dialog">
+		<div class="modal-content">
+		  <div class="modal-header">
+			<h5 class="modal-title">MODYFIKUJ KONTRAHENTA</h5>
+			<button type="button" class="btn-close" aria-label="Close" @onclick="CloseModal"></button>
+		  </div>
+		  <div class="modal-body">
+			  	<div class="col-auto ms-auto d-flex align-items-center gap-2 mb-3">
+					<label class="form-label mb-0 fw-bold text-nowrap">Wybierz kontrahenta:</label>
+					<select class="form-select" @onchange="OnKontrahentSelectedMODAL">
+						<option value="0">Wybierz przedmiot</option>
+						@if (Konty != null)
+						{
+							@foreach (var mag in Konty)
+							{
+								<option value="@mag.Id">ID: @mag.Id (@mag.Nazwa)</option>
+							}
+						}
+					</select>
+				</div>
+			<div class="form-row mb-3">
+				<div class="mb-3">
+					<input type="text" class="form-control" @bind="nowaNazwa" placeholder="Nazwa kontrahenta">
+				</div>
+				<div class="mb-3">
+					<input type="text" class="form-control" @bind="nowyOpis" placeholder="Opis kontrahenta">
+				</div>
+				<div class="mb-3">
+					<label class="form-label fw-bold d-block">Rola kontrahenta:</label>
+					<InputRadioGroup @bind-Value="wybranyTyp">
+						<div class="form-check form-check-inline">
+							<InputRadio class="form-check-input" Value="true" id="radioDostawcaEdit" />
+							<label class="form-check-label" for="radioDostawcaEdit">Dostawca</label>
+						</div>
+						<div class="form-check form-check-inline">
+							<InputRadio class="form-check-input" Value="false" id="radioOdbiorcaEdit" />
+							<label class="form-check-label" for="radioOdbiorcaEdit">Odbiorca</label>
+						</div>
+					</InputRadioGroup>
+				</div>
+			</div>
+		  </div>
+		  <div class="modal-footer">
+			<button type="button" class="btn btn-secondary" @onclick="CloseModal">Zamknij</button>
+			<button type="button" class="btn btn-primary" @onclick="EditKONTA">Zmień</button>
+		  </div>
+		</div>
+	  </div>
+	</div>
+}
+
+@if (isModalOpenDEL){
+	<div class="modal" tabindex="-1" style="display: block; background-color: rgba(0,0,0,0.5);">
+	  <div class="modal-dialog">
+		<div class="modal-content">
+		  <div class="modal-header">
+			<h5 class="modal-title">USUŃ KONTRAHENTA</h5>
+			<button type="button" class="btn-close" aria-label="Close" @onclick="CloseModal"></button>
+		  </div>
+		  <div class="modal-body">
+			<div class="form-row">
+			<div class="col">
+				<p>Wpisz ID kontrahentu, który chcesz usunąć.</p>
+				<input type="int" class="form-control" @bind="usunID" placeholder="ID kontrahentu">
+			</div>
+			</div>
+
+		  </div>
+		  <div class="modal-footer">
+			<button type="button" class="btn btn-secondary" @onclick="CloseModal">Zamknij</button>
+			<button type="button" class="btn btn-primary" @onclick="UsunKONTA">Usuń</button>
+		  </div>
+		</div>
+	  </div>
+	</div>
+}
+
+
+@code{
+	private bool isModalOpen = false;
+	private bool isModalOpenEDIT = false;
+	private bool isModalOpenDEL = false;
+	private bool wygenerujLoki = false;
+
+	private string nowaNazwa = string.Empty;
+	private string nowyOpis = string.Empty;
+	private bool wybranyTyp = false;
+
+	private List<int> wybraneIdPrzedmiotow = new List<int>();
+
+	private void OnPrzedmiotCheckboxChanged(int przedmiotId, object? isChecked)
+	{
+		bool checkedState = isChecked is bool b && b;
+
+		if (checkedState)
+		{
+			if (!wybraneIdPrzedmiotow.Contains(przedmiotId))
+			{
+				wybraneIdPrzedmiotow.Add(przedmiotId);
+			}
+		}
+		else
+		{
+			wybraneIdPrzedmiotow.Remove(przedmiotId);
+		}
+	}
+
+	private int editID = 0;
+	private int usunID = 0;
+
+	private List<Kontrahent>? Konty;
+	private List<Przedmiot>? Przeds;
+
+
+	private void OpenModalADD()
+	{
+		isModalOpen = true;
+	}
+	private void OpenModalEDIT()
+	{
+		isModalOpenEDIT = true;
+	}
+	private void OpenModalDEL()
+	{
+		isModalOpenDEL = true;
+	}
+	private void CloseModal()
+	{
+		isModalOpen = false;
+		isModalOpenDEL = false;
+		isModalOpenEDIT = false;
+	}
+
+
+
+	protected override async Task OnInitializedAsync()
+	{
+		await RefreshList();
+	}
+
+	private async Task OnKontrahentSelectedMODAL(ChangeEventArgs e)
+	{
+		if (int.TryParse(e.Value?.ToString(), out int selectedId))
+		{
+			editID = selectedId;
+		}
+		var kontrEDIT = await KontrahentRepository.GetByIdAsync(editID);
+		if (kontrEDIT != null)
+		{
+			nowaNazwa = kontrEDIT.Nazwa;
+			nowyOpis = kontrEDIT.Opis;
+			wybranyTyp = (kontrEDIT.Typ == MagazynApp.Domain.Enums.TypKontrahent.Dostawca ? true : false);
+
+		}
+		else
+		{
+			nowaNazwa = string.Empty;
+			nowyOpis = string.Empty;
+		}
+	}
+
+	protected async Task RefreshList()
+	{
+		var kontrahenci = await KontrahentRepository.GetAllAsync();
+		Konty = kontrahenci.ToList();
+
+		var przedmioty = await PrzedmiotRepository.GetAllAsync();
+		Przeds = przedmioty.ToList();
+	}
+
+	private async Task AddKONTA()
+	{
+		if (string.IsNullOrWhiteSpace(nowaNazwa))
+			return;
+
+		var nowyKontrahent = new Kontrahent
+		{
+			Nazwa = nowaNazwa,
+			Opis = nowyOpis,
+			Typ = wybranyTyp ? MagazynApp.Domain.Enums.TypKontrahent.Dostawca : MagazynApp.Domain.Enums.TypKontrahent.Odbiorca,
+		};
+
+		// EF Core zapisze Magazyn, pobierze jego nowe Id i automatycznie 
+		// przypisze je do wszystkich lokalizacji w jednej transakcji!
+		await KontrahentRepository.AddAsync(nowyKontrahent);
+		if (wygenerujLoki)
+		{
+			foreach (var prz in wybraneIdPrzedmiotow)
+			{
+				var przedmiot = await PrzedmiotRepository.GetByIdAsync(prz);
+				if (przedmiot != null)
+				{
+					if(nowyKontrahent.Typ == MagazynApp.Domain.Enums.TypKontrahent.Dostawca)
+					{
+						przedmiot.DostawcaId = nowyKontrahent.Id;
+						await PrzedmiotRepository.UpdateAsync(przedmiot);
+					}
+					else if(nowyKontrahent.Typ == MagazynApp.Domain.Enums.TypKontrahent.Odbiorca)
+					{
+						przedmiot.OdbiorcaId = nowyKontrahent.Id;
+						await PrzedmiotRepository.UpdateAsync(przedmiot);
+					}
+				}
+			}
+		}
+
+		nowaNazwa = string.Empty;
+		nowyOpis = string.Empty;
+		isModalOpen = false;
+		wygenerujLoki = false;
+		await RefreshList();
+	}
+
+	private async Task EditKONTA()
+	{
+		if (string.IsNullOrWhiteSpace(nowaNazwa))
+			return;
+
+		var EDITkont = await KontrahentRepository.GetByIdAsync(editID);
+		if (EDITkont == null){return;}
+
+		EDITkont.Nazwa = nowaNazwa;
+		EDITkont.Opis = nowyOpis;
+		EDITkont.Typ = wybranyTyp ? MagazynApp.Domain.Enums.TypKontrahent.Dostawca : MagazynApp.Domain.Enums.TypKontrahent.Odbiorca;
+		await KontrahentRepository.UpdateAsync(EDITkont);
+
+		nowaNazwa = string.Empty;
+		nowyOpis = string.Empty;
+		isModalOpenEDIT = false;
+		await RefreshList();
+
+	}
+
+	protected async Task UsunKONTA()
+	{
+		if (usunID <= 0)
+			return;
+		var kontrahent = await KontrahentRepository.GetByIdAsync(usunID);
+		if (kontrahent != null)
+		{
+			await KontrahentRepository.DeleteAsync(usunID);
+			await RefreshList();
+		}
+		usunID = 0;
+		isModalOpenDEL = false;
+	}
+}
+
+
+@if (Konty is null)
+{
+	<p><em>Ładowanie...</em></p>
+}
+else
+{
+	<table class="table table-bordered">
+		<thead>
+			<tr>
+				<th>Id</th>
+				<th>Nazwa</th>
+				<th>Typ</th>	
+				<th>Opis</th>
+			</tr>
+		</thead>
+		<tbody>
+			@foreach (var mag in Konty)
+			{
+				<tr>
+					<td>@mag.Id</td>
+					<td>@mag.Nazwa</td>
+					<td>@mag.Typ</td>
+					<td>@mag.Opis</td>
+				</tr>
+			}
+		</tbody>
+	</table>
+}
